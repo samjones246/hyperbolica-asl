@@ -12,13 +12,16 @@ state("Hyperbolica")
 startup
 {
     // For logging (duh)
-    vars.Log = (Action<object>)((output) => print("[Process ASL] " + output));
+    vars.Log = (Action<object>)((output) => print("[Hyperbolica ASL] " + output));
 }
 
 start {
     // When menuActive becomes true, start the timer
-    vars.Log("Starting Timer");
-    return old.menuActive && !current.menuActive;
+    if (old.menuActive && !current.menuActive){
+        vars.Log("Starting Timer");
+        return true;
+    }
+    return false;
 }
 
 split
@@ -34,4 +37,6 @@ split
         vars.Log("Lever pulled, splitting");
         return true;
     }
+
     return false;
+}
