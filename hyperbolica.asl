@@ -47,7 +47,7 @@ split
     }
 
     // Split when lever pulled after boss fight
-    if (!old.levelPulled && current.leverPulled) {
+    if (!old.leverPulled && current.leverPulled) {
         vars.Log("Lever pulled, splitting");
         return true;
     }
