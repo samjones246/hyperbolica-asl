@@ -7,9 +7,8 @@ state("Hyperbolica")
 
     int crystalsObtained : "GameAssembly.dll", 0x00DF0A38, 0x760, 0x80, 0x310, 0x70, 0x1D0;
 
-    // True once the lever is pulled. Second value is used if the player is returning to the boss after dying/quitting
-    bool leverPulled : "GameAssembly.dll", 0x00D743D8, 0xA8, 0x68, 0x20, 0x10, 0x28, 0xA0, 0x1BD;
-    bool leverPulled_retry : "GameAssembly.dll", 0x00DE39D8, 0x90, 0x28, 0x20, 0x20, 0x148, 0x1BD;
+    // True once the lever is pulled
+    bool leverPulled : "GameAssembly.dll", 0x00D8C648, 0xD8, 0x20, 0x28, 0x20, 0xE8, 0x28, 0x1BD;
 
     bool isLoading : "UnityPlayer.dll", 0x019E6CC0, 0x0, 0x208, 0x10, 0x520;
 }
@@ -48,7 +47,7 @@ split
     }
 
     // Split when lever pulled after boss fight
-    if (current.leverPulled || current.leverPulled_retry) {
+    if (!old.levelPulled && current.leverPulled) {
         vars.Log("Lever pulled, splitting");
         return true;
     }
