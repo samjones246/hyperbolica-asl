@@ -1,9 +1,7 @@
 state("Hyperbolica")
 {
     // This boolean is set to false when the player clicks 'new game'
-    // Second value is used if the player has not just launched the game
-    bool menuActive : "GameAssembly.dll", 0x00DED008, 0x638, 0xB8, 0x8, 0x26C;
-    bool menuActive2 : "GameAssembly.dll", 0x00D7F298, 0xA0, 0x8, 0x50, 0xB8, 0x10, 0x88, 0x56C;
+    bool menuActive : "GameAssembly.dll", 0x00D7F298, 0xA0, 0x8, 0x50, 0xB8, 0x10, 0x88, 0x56C;
 
     int crystalsObtained : "GameAssembly.dll", 0x00DF0A38, 0x760, 0x80, 0x310, 0x70, 0x1D0;
 
@@ -26,7 +24,7 @@ init {
 
 start {
     // When menuActive becomes true, start the timer
-    if (old.menuActive && !current.menuActive || old.menuActive2 && !current.menuActive2){
+    if (old.menuActive && !current.menuActive){
         vars.Log("Starting Timer");
         return true;
     }
