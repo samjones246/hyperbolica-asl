@@ -1,12 +1,12 @@
 state("Hyperbolica")
 {
-    // This boolean is set to false when the player clicks 'new game'
-    bool menuActive : "GameAssembly.dll", 0x00D802F0, 0xA0, 0x8, 0x50, 0xB8, 0x10, 0x88, 0x56C;
+    // This boolean is set to true when the player clicks 'new game'
+    bool buttonClicked : "GameAssembly.dll", 0x00E77E00, 0xF68, 0x150, 0x2A8, 0x110, 0x10, 0x18, 0x198;
 
-    int crystalsObtained : "GameAssembly.dll", 0x00DF1B38, 0x760, 0x80, 0x310, 0x70, 0x1D0;
+    int crystalsObtained : "GameAssembly.dll", 0x00DF1B68, 0x760, 0x80, 0x310, 0x70, 0x1D0;
 
     // True once the lever is pulled
-    bool leverPulled : "GameAssembly.dll", 0x00D8A140, 0xD8, 0x20, 0x28, 0x20, 0xE8, 0x28, 0x1BD;
+    bool leverPulled : "GameAssembly.dll", 0x00DE4AD8, 0x150, 0x248, 0x20, 0x28, 0x20, 0xA0, 0x1BD;
 
     bool isLoading : "UnityPlayer.dll", 0x019E6CC0, 0x0, 0x208, 0x10, 0x520;
 }
@@ -23,8 +23,8 @@ init {
 }
 
 start {
-    // When menuActive becomes true, start the timer
-    if (old.menuActive && !current.menuActive){
+    // When buttonClicked becomes true, start the timer
+    if (current.buttonClicked && !old.buttonClicked){
         vars.Log("Starting Timer");
         return true;
     }
@@ -45,7 +45,7 @@ split
     }
 
     // Split when lever pulled after boss fight
-    if (!old.leverPulled && current.leverPulled) {
+    if (vars.crystals >= 5 && !old.leverPulled && current.leverPulled) {
         vars.Log("Lever pulled, splitting");
         return true;
     }
