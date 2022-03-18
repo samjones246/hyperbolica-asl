@@ -4,11 +4,13 @@ LiveSplit autosplitter for Hyperbolica
 
 ## Features
  - Start timer on 'New Game' clicked
- - Split on crystal collection
- - Split on lever pulled after boss
+ - Options for intermediary splits:
+   - Split on crystal collection
+   - Split on first trinket (map)
+   - Split on every trinket
+ - Final split on pulling lever after boss
  - Load removal
 
 ## TODO
- - Split on any trinket collection, for true ending
  - Split on sub area enter/exit
- - Settings
+ - Fix bugs
