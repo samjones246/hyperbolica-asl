@@ -1,21 +1,17 @@
 state("Hyperbolica")
 {
     // This boolean is set to true when the player clicks 'new game'
-    bool buttonClicked : "GameAssembly.dll", 0x00E77E00, 0xF68, 0x150, 0x2A8, 0x110, 0x10, 0x18, 0x198;
-
+    bool buttonClicked : "UnityPlayer.dll", 0x019E6D00, 0xEA0, 0x6C8, 0x120, 0x18, 0x60, 0x1B0, 0x138;
 
     int numCrystals : "GameAssembly.dll", 0x00DF1B68, 0x760, 0x80, 0x310, 0x70, 0x1D0;
 
     // Number of trinkets collected since launching the game
-    int numTrinkets : "GameAssembly.dll", 0x00DEEFD8, 0x160, 0x3C0, 0x100, 0x18, 0x120, 0xF0, 0xC0;
+    int numTrinkets : "GameAssembly.dll", 0x00D813B8, 0xB8, 0x0, 0x200, 0x10, 0xF0, 0xF0, 0xC0;
 
     // True once the lever is pulled
-    bool leverPulled : "GameAssembly.dll", 0x00DE4AD8, 0x150, 0x248, 0x20, 0x28, 0x20, 0xA0, 0x1BD;
+    bool leverPulled : "GameAssembly.dll", 0x00DE4AE8, 0x150, 0x248, 0x20, 0x28, 0x20, 0xA0, 0x1BD;
 
     bool isLoading : "UnityPlayer.dll", 0x019E6CC0, 0x0, 0x208, 0x10, 0x520;
-
-    // Currently unused
-    bool isPaused : "GameAssembly.dll", 0x00D80728, 0x78, 0x48, 0x40, 0x80, 0xB0, 0xB8, 0x07;
 }
 
 startup
@@ -32,14 +28,14 @@ startup
 init {
     // Seems to be some volatility in numCrystals pointer during loads, stable copy of last known value to fix
     vars.crystals = 0;
+    // Trinkets collected during current run
+    vars.trinkets = 0;
 }
 
 start {
     // When buttonClicked becomes true, start the timer
     if (current.buttonClicked && !old.buttonClicked){
         vars.Log("Starting Timer");
-        // Trinkets collected during current run
-        vars.trinkets = 0;
         return true;
     }
     return false;
