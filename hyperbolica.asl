@@ -1,7 +1,7 @@
-state("Hyperbolica")
+state("Hyperbolica", "1.0.8")
 {
     // This boolean is set to true when the player clicks 'new game'
-    bool buttonClicked : "UnityPlayer.dll", 0x019E6D00, 0xEA0, 0x6C8, 0x120, 0x18, 0x60, 0x1B0, 0x138;
+    bool buttonClicked : "GameAssembly.dll", 0x00D82FB0, 0xB8, 0x8, 0x150, 0x10, 0x1E0, 0x2D0, 0x138;
 
     int numCrystals : "GameAssembly.dll", 0x00DF1B68, 0x760, 0x80, 0x310, 0x70, 0x1D0;
 
