@@ -22,13 +22,41 @@ startup
     // Function for deallocating memory used by this process
     vars.FreeMemory = (Action<Process>)(p => {
         vars.Log("Deallocating");
-        p.FreeMemory((IntPtr)vars.sceneDumpPtr);
-        p.FreeMemory((IntPtr)vars.destPtr);
-        p.FreeMemory((IntPtr)vars.gatePtr);
+        foreach (IDictionary<string, object> hook in vars.hooks){
+            p.FreeMemory((IntPtr)hook["outputPtr"]);
+            p.FreeMemory((IntPtr)hook["funcPtr"]);
+            p.FreeMemory((IntPtr)hook["origPtr"]);
+        }
     });
 
-    // AOB signature for LoadScene
-    vars.scanLoadScene = new SigScanTarget(0, "D7 FF CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 48 89 5C 24 10");
+    vars.hooks = new List<ExpandoObject> {
+        (vars.loadLevel = new ExpandoObject()),
+        (vars.newGame = new ExpandoObject()),
+        //(vars.leverInteract = new ExpandoObject()),
+        //(vars.trinketCollect = new ExpandoObject())
+    };
+
+    vars.loadLevel.name = "LoadLevel";
+    vars.loadLevel.pattern = "D7 FF CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 48 89 5C 24 10";
+    vars.loadLevel.outputSize = 0x08;
+    vars.loadLevel.patternOffset = 0x11;
+    vars.loadLevel.overwriteBytes = 15;
+    vars.loadLevel.payload = new byte[] { 0x48, 0x89, 0x0A };
+
+    //vars.newGame = new ExpandoObject();
+    vars.newGame.name = "NewGame";
+    vars.newGame.pattern = "40 53 48 83 EC 30 80 3D 1C 3A 59 00 00";
+    vars.newGame.outputSize = 0x01;
+    vars.newGame.patternOffset = 0x00;
+    vars.newGame.overwriteBytes = 13;
+    vars.newGame.payload = new byte[] { 0xC7, 0x02, 0x01, 0x00, 0x00, 0x00 };
+    //vars.newGame.payload = new byte[] { 0x90 };
+
+    //vars.leverInteract.pattern = "";
+    //vars.newGame.outputType = typeof(bool);
+
+    //vars.trinketCollect.pattern = "";
+    //vars.newGame.outputType = typeof(bool);
 
     // Create settings
     settings.Add("splitCrystal", true, "Split on crystal collection");
@@ -66,72 +94,79 @@ init {
     // Trinkets collected during current run
     vars.trinkets = 0;
 
+    var gameAssembly = modules[41];
+    var scanner = new SignatureScanner(game, gameAssembly.BaseAddress, gameAssembly.ModuleMemorySize);
+
+    // Install hooks
+    foreach (IDictionary<string, object> hook in vars.hooks)
+    {
+        vars.Log("Installing hook for " + hook["name"]);
+        // AOB Scan to find injection point
+        SigScanTarget target = new SigScanTarget(0, (string)hook["pattern"]);
+        if ((IntPtr)(hook["injectPtr"] = scanner.Scan(target)) == IntPtr.Zero) {
+            throw new Exception("[Hyperbolica ASL] Signature not matched for " + hook["name"]);
+        }
+        hook["injectPtr"] = (IntPtr)hook["injectPtr"] + (int)hook["patternOffset"];
+
+        // Allocate memory for output
+        hook["outputPtr"] = game.AllocateMemory((int)hook["outputSize"]);
+
+        // Build the hook function
+        var funcBytes = new List<byte>() {
+            0x52,      // push rdx
+            0x48, 0xBA // mov rdx, outputPtr
+        };
+        funcBytes.AddRange(BitConverter.GetBytes((UInt64)((IntPtr)hook["outputPtr"])));
+        funcBytes.AddRange((byte[])hook["payload"]);
+        if ((string)hook["name"] == "NewGame"){
+            funcBytes.AddRange(new byte[] { 0x48, 0xB8 }); // mov rax, ...
+            IntPtr dest = gameAssembly.BaseAddress + 0xC79219;
+            funcBytes.AddRange(BitConverter.GetBytes((UInt64)dest)); // ...GameAssembly.dll+C79219
+            funcBytes.AddRange(new byte[] { 0x83, 0x38, 0x00 }); // cmp dword ptr [rax], 00
+        }
+        funcBytes.Add(0x5A); // pop rdx
+
+        // Allocate memory to store the function
+        hook["funcPtr"] = game.AllocateMemory(funcBytes.Count + 12);
+        
+        // Write the detour: Injection point -> hook function -> orignal code -> injection point + 1
+        game.Suspend();
+        try {
+            // The address where a copy of the overwritten code is stored
+            hook["origPtr"] = game.WriteDetour((IntPtr)hook["injectPtr"], (int)hook["overwriteBytes"], (IntPtr)hook["funcPtr"]);
+            
+            // Write the hook function
+            game.WriteBytes((IntPtr)hook["funcPtr"], funcBytes.ToArray());
+
+            // Write the jump hook function to original code
+            game.WriteJumpInstruction((IntPtr)hook["funcPtr"] + funcBytes.Count, (IntPtr)hook["origPtr"]);
+        }
+        catch {
+            vars.FreeMemory(game);
+            throw;
+        }
+        finally{
+            game.Resume();
+        }
+
+        vars.Log("Output: " + ((IntPtr)hook["outputPtr"]).ToString("X"));
+        vars.Log("Injection: " + ((IntPtr)hook["injectPtr"]).ToString("X"));
+        vars.Log("Function: " + ((IntPtr)hook["funcPtr"]).ToString("X"));
+        vars.Log("Original: " + ((IntPtr)hook["origPtr"]).ToString("X"));
+    }
+
     vars.sceneNameOld = "Unknown";
     vars.sceneNameNew = "Unknown"; 
 
     vars.sceneNamePtrOld = IntPtr.Zero;
     vars.sceneNamePtrNew = IntPtr.Zero;
 
-    // AOB Scan for LoadScene
-    vars.srcPtr = IntPtr.Zero;
-    vars.Log("Scanning memory for ");
-    var scanner = new SignatureScanner(game, modules[41].BaseAddress, modules[41].ModuleMemorySize);
-    vars.srcPtr = scanner.Scan(vars.scanLoadScene);
+    vars.newGameClicked = false;
 
-    if (vars.srcPtr == IntPtr.Zero) {
-        throw new Exception("[Hyperbolica ASL] LoadScene signature not matched");
-    }
-
-    // Allocate memory where pointer to scene name will be dumped
-    vars.sceneDumpPtr = game.AllocateMemory(8);
-    var sceneDumpPtrBytes = BitConverter.GetBytes((UInt64)vars.sceneDumpPtr);
-
-    // Initialise injected code
-    var injectedFuncBytes = new List<byte>() {
-        0x52,      // push rdx
-        0x48, 0xBA // mov rdx, sceneDumpPtr
-    };
-    injectedFuncBytes.AddRange(sceneDumpPtrBytes);
-    injectedFuncBytes.AddRange(new byte[] {
-        0x48, 0x89, 0x0A,             // mov [rdx], rcx
-        0x5A,                         // pop rdx
-        0x48, 0x89, 0x5C, 0x24, 0x10, // mov[rsp+10], rbx
-    });
-
-    var jmpOffset = injectedFuncBytes.Count;
-    vars.destPtr = game.AllocateMemory(injectedFuncBytes.Count+12);
-
-    
-    vars.Log("Found injection point at " + vars.srcPtr);
-    // Increment vars.srcPtr by 0x11 to get to point in signature where we want to inject
-    vars.srcPtr += 0x11;
-
-    // Overwrite 15 bytes at vars.srcPtr with jump to injected code
-    game.Suspend();
-    try 
-    {
-        vars.gatePtr = game.WriteDetour((IntPtr)vars.srcPtr, 15, (IntPtr)vars.destPtr);
-        var gatePtrBytes = BitConverter.GetBytes((UInt64)vars.gatePtr); 
-
-        // Write the injected function
-        game.WriteBytes((IntPtr)vars.destPtr, injectedFuncBytes.ToArray());
-
-        // Write the jump from end of dest to gate
-        game.WriteJumpInstruction((IntPtr)vars.destPtr + jmpOffset, (IntPtr)vars.gatePtr);
-
-    } 
-    catch 
-    {
-        vars.FreeMemory(game);
-        throw;
-    } 
-    finally 
-    {
-        game.Resume();
-    }
-
-    vars.Log("sceneDumpPtr: " + vars.sceneDumpPtr.ToString("X"));
-
+    // Fix relative addressing problem in new game hook
+    IntPtr loc = ((IntPtr)vars.newGame.origPtr) + 6;
+    vars.newGame.origCmpBytes = game.ReadBytes(loc, 7);
+    game.WriteBytes(loc, new byte[] {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90});
 }
 
 update
@@ -139,11 +174,11 @@ update
     // Get pointer to destination scene name from dump location
     vars.sceneNamePtrOld = vars.sceneNamePtrNew;
     vars.sceneNameOld = vars.sceneNameNew;
-    vars.sceneNamePtrNew = game.ReadValue<IntPtr>((IntPtr)vars.sceneDumpPtr);
+    vars.sceneNamePtrNew = game.ReadValue<IntPtr>((IntPtr)vars.loadLevel.outputPtr);
     if (vars.sceneNamePtrOld == vars.sceneNamePtrNew){
         return;
     }
-    if (vars.sceneNamePtrNew != IntPtr.Zero){
+    if (vars.sceneNamePtrNew != IntPtr.Zero){ 
         // Read string length, then read that many characters
         int length = game.ReadValue<int>((IntPtr)vars.sceneNamePtrNew+0x10);
         char[] nameChars = new char[length];
@@ -161,8 +196,10 @@ update
 
 start {
     // When buttonClicked becomes true, start the timer
-    if (current.buttonClicked && !old.buttonClicked){
+    var newGameClicked = game.ReadValue<bool>((IntPtr)vars.newGame.outputPtr);
+    if (newGameClicked){
         vars.Log("Starting Timer");
+        game.WriteValue<bool>((IntPtr)vars.newGame.outputPtr, false);
         return true;
     }
     return false;
@@ -219,10 +256,14 @@ shutdown
     game.Suspend();
     try
     {
-        // Remove hook
         vars.Log("Restoring memory");
-        var bytes = game.ReadBytes((IntPtr)vars.gatePtr, 15);
-        game.WriteBytes((IntPtr)vars.srcPtr, bytes);
+        foreach (IDictionary<string, object> hook in vars.hooks){
+            var bytes = game.ReadBytes((IntPtr)hook["origPtr"], (int)hook["overwriteBytes"]);
+            game.WriteBytes((IntPtr)hook["injectPtr"], bytes);
+            if ((string)hook["name"] == "NewGame"){
+                game.WriteBytes(((IntPtr)hook["injectPtr"]) + 6, (byte[])vars.newGame.origCmpBytes);
+            }
+        }
         vars.Log("Memory restored");
     }
     catch
