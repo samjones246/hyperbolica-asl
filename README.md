@@ -10,7 +10,7 @@ LiveSplit autosplitter for Hyperbolica
    - Split on every trinket
  - Final split on pulling lever after boss
  - Load removal
+ - Split on sub area enter/exit
 
 ## TODO
- - Split on sub area enter/exit
  - Fix bugs
