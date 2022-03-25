@@ -19,17 +19,6 @@ startup
     // For logging (duh) 
     vars.Log = (Action<object>)((output) => print("[Hyperbolica ASL] " + output));
 
-    // Function for deallocating memory used by this process
-    vars.FreeMemory = (Action<Process>)(p => {
-        vars.Log("Deallocating");
-        p.FreeMemory((IntPtr)vars.sceneDumpPtr);
-        p.FreeMemory((IntPtr)vars.destPtr);
-        p.FreeMemory((IntPtr)vars.gatePtr);
-    });
-
-    // AOB signature for LoadScene
-    vars.scanLoadScene = new SigScanTarget(0, "D7 FF CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 48 89 5C 24 10");
-
     // Create settings
     settings.Add("splitCrystal", true, "Split on crystal collection");
     settings.Add("splitMap", false, "Split on first trinket collection");
@@ -38,29 +27,6 @@ startup
     settings.Add("splitSubEnter", false, "Split on entering a subarea");
     settings.Add("splitSubExit", false, "Split on exiting a subarea");
 
-    var subareas = new string[] {
-        "Cafe",
-        "Farm",
-        "Snow",
-        "Maze",
-        "Gallery"
-    };
-
-    vars.isSubarea = (Func<string, bool>)(name => {
-        return Array.Exists(subareas, e => e == name);
-    });
-
-    vars.enteredSubarea = (Func<bool>)(() => {
-        return vars.sceneNameOld == "Over" && vars.isSubarea(vars.sceneNameNew);
-    });
-
-    vars.leftSubarea = (Func<bool>)(() => {
-        return vars.sceneNameNew == "Over" && vars.isSubarea(vars.sceneNameOld);
-    });
-
-    vars.sceneNameOld = "Unknown";
-    vars.sceneNameNew = "Unknown"; 
-
 }
 
 init {
@@ -68,96 +34,6 @@ init {
     vars.crystals = 0;
     // Trinkets collected during current run
     vars.trinkets = 0;
-
-
-    vars.sceneNamePtrOld = IntPtr.Zero;
-    vars.sceneNamePtrNew = IntPtr.Zero;
-
-    // AOB Scan for LoadScene
-    vars.srcPtr = IntPtr.Zero;
-    vars.Log("Scanning memory for ");
-    var scanner = new SignatureScanner(game, modules[41].BaseAddress, modules[41].ModuleMemorySize);
-    vars.srcPtr = scanner.Scan(vars.scanLoadScene);
-
-    if (vars.srcPtr == IntPtr.Zero) {
-        throw new Exception("[Hyperbolica ASL] LoadScene signature not matched");
-    }
-
-    // Allocate memory where pointer to scene name will be dumped
-    vars.sceneDumpPtr = game.AllocateMemory(8);
-    var sceneDumpPtrBytes = BitConverter.GetBytes((UInt64)vars.sceneDumpPtr);
-
-    // Initialise injected code
-    var injectedFuncBytes = new List<byte>() {
-        0x52,      // push rdx
-        0x48, 0xBA // mov rdx, sceneDumpPtr
-    };
-    injectedFuncBytes.AddRange(sceneDumpPtrBytes);
-    injectedFuncBytes.AddRange(new byte[] {
-        0x48, 0x89, 0x0A,             // mov [rdx], rcx
-        0x5A,                         // pop rdx
-        0x48, 0x89, 0x5C, 0x24, 0x10, // mov[rsp+10], rbx
-    });
-
-    var jmpOffset = injectedFuncBytes.Count;
-    vars.destPtr = game.AllocateMemory(injectedFuncBytes.Count+12);
-
-    
-    vars.Log("Found injection point at " + vars.srcPtr);
-    // Increment vars.srcPtr by 0x11 to get to point in signature where we want to inject
-    vars.srcPtr += 0x11;
-
-    // Overwrite 15 bytes at vars.srcPtr with jump to injected code
-    game.Suspend();
-    try 
-    {
-        vars.gatePtr = game.WriteDetour((IntPtr)vars.srcPtr, 15, (IntPtr)vars.destPtr);
-        var gatePtrBytes = BitConverter.GetBytes((UInt64)vars.gatePtr); 
-
-        // Write the injected function
-        game.WriteBytes((IntPtr)vars.destPtr, injectedFuncBytes.ToArray());
-
-        // Write the jump from end of dest to gate
-        game.WriteJumpInstruction((IntPtr)vars.destPtr + jmpOffset, (IntPtr)vars.gatePtr);
-
-    } 
-    catch 
-    {
-        vars.FreeMemory(game);
-        throw;
-    } 
-    finally 
-    {
-        game.Resume();
-    }
-
-    vars.Log("sceneDumpPtr: " + vars.sceneDumpPtr.ToString("X"));
-
-}
-
-update
-{
-    // Get pointer to destination scene name from dump location
-    vars.sceneNamePtrOld = vars.sceneNamePtrNew;
-    vars.sceneNameOld = vars.sceneNameNew;
-    vars.sceneNamePtrNew = game.ReadValue<IntPtr>((IntPtr)vars.sceneDumpPtr);
-    if (vars.sceneNamePtrOld == vars.sceneNamePtrNew){
-        return;
-    }
-    if (vars.sceneNamePtrNew != IntPtr.Zero){
-        // Read string length, then read that many characters
-        int length = game.ReadValue<int>((IntPtr)vars.sceneNamePtrNew+0x10);
-        char[] nameChars = new char[length];
-        for (int i=0;i<length;i++){
-            IntPtr charPtr = vars.sceneNamePtrNew + 0x14 + (i * 2);
-            nameChars[i] = game.ReadValue<char>(charPtr);
-        }
-        // Put chars together to form the string
-        vars.sceneNameNew = new String(nameChars);
-    }
-    if (vars.sceneNameNew != vars.sceneNameOld){
-        vars.Log("Transitioning from '" + vars.sceneNameOld + "' to '" + vars.sceneNameNew + "'");
-    }
 }
 
 start {
@@ -197,42 +73,5 @@ split
         return true;
     }
 
-    // Split on entering sub area
-    if (settings["splitSubEnter"] && vars.enteredSubarea()){
-        vars.Log("Entering subarea, splitting");
-        return true;
-    }
-
-    if (settings["splitSubExit"] && vars.leftSubarea()){
-        vars.Log("Leaving subarea, splitting");
-        return true;
-    }
-
-
     return false;
-}
-
-shutdown
-{
-    if (game == null)
-        return;
-
-    game.Suspend();
-    try
-    {
-        // Remove hook
-        vars.Log("Restoring memory");
-        var bytes = game.ReadBytes((IntPtr)vars.gatePtr, 15);
-        game.WriteBytes((IntPtr)vars.srcPtr, bytes);
-        vars.Log("Memory restored");
-    }
-    catch
-    {
-        throw;
-    }
-    finally
-    {
-        game.Resume();
-        vars.FreeMemory(game);
-    }
 }
