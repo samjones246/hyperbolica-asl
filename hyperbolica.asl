@@ -23,6 +23,9 @@ startup
     vars.FreeMemory = (Action<Process>)(p => {
         vars.Log("Deallocating");
         foreach (IDictionary<string, object> hook in vars.hooks){
+            if(((bool)hook["enabled"]) == false){
+                continue;
+            }
             p.FreeMemory((IntPtr)hook["outputPtr"]);
             p.FreeMemory((IntPtr)hook["funcPtr"]);
             p.FreeMemory((IntPtr)hook["origPtr"]);
@@ -42,8 +45,8 @@ startup
     vars.loadLevel.patternOffset = 0x11;
     vars.loadLevel.overwriteBytes = 15;
     vars.loadLevel.payload = new byte[] { 0x48, 0x89, 0x0A };
+    vars.loadLevel.enabled = true;
 
-    //vars.newGame = new ExpandoObject();
     vars.newGame.name = "NewGame";
     vars.newGame.pattern = "40 53 48 83 EC 30 80 3D 1C 3A 59 00 00";
     vars.newGame.outputSize = 0x01;
@@ -51,6 +54,7 @@ startup
     vars.newGame.overwriteBytes = 13;
     vars.newGame.payload = new byte[] { 0xC7, 0x02, 0x01, 0x00, 0x00, 0x00 };
     //vars.newGame.payload = new byte[] { 0x90 };
+    vars.newGame.enabled = false;
 
     //vars.leverInteract.pattern = "";
     //vars.newGame.outputType = typeof(bool);
@@ -100,6 +104,9 @@ init {
     // Install hooks
     foreach (IDictionary<string, object> hook in vars.hooks)
     {
+        if(((bool)hook["enabled"]) == false){
+            continue;
+        }
         vars.Log("Installing hook for " + hook["name"]);
         // AOB Scan to find injection point
         SigScanTarget target = new SigScanTarget(0, (string)hook["pattern"]);
@@ -118,12 +125,6 @@ init {
         };
         funcBytes.AddRange(BitConverter.GetBytes((UInt64)((IntPtr)hook["outputPtr"])));
         funcBytes.AddRange((byte[])hook["payload"]);
-        if ((string)hook["name"] == "NewGame"){
-            funcBytes.AddRange(new byte[] { 0x48, 0xB8 }); // mov rax, ...
-            IntPtr dest = gameAssembly.BaseAddress + 0xC79219;
-            funcBytes.AddRange(BitConverter.GetBytes((UInt64)dest)); // ...GameAssembly.dll+C79219
-            funcBytes.AddRange(new byte[] { 0x83, 0x38, 0x00 }); // cmp dword ptr [rax], 00
-        }
         funcBytes.Add(0x5A); // pop rdx
 
         // Allocate memory to store the function
@@ -160,13 +161,6 @@ init {
 
     vars.sceneNamePtrOld = IntPtr.Zero;
     vars.sceneNamePtrNew = IntPtr.Zero;
-
-    vars.newGameClicked = false;
-
-    // Fix relative addressing problem in new game hook
-    IntPtr loc = ((IntPtr)vars.newGame.origPtr) + 6;
-    vars.newGame.origCmpBytes = game.ReadBytes(loc, 7);
-    game.WriteBytes(loc, new byte[] {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90});
 }
 
 update
@@ -196,10 +190,8 @@ update
 
 start {
     // When buttonClicked becomes true, start the timer
-    var newGameClicked = game.ReadValue<bool>((IntPtr)vars.newGame.outputPtr);
-    if (newGameClicked){
+    if (current.buttonClicked && !old.buttonClicked){
         vars.Log("Starting Timer");
-        game.WriteValue<bool>((IntPtr)vars.newGame.outputPtr, false);
         return true;
     }
     return false;
@@ -258,11 +250,11 @@ shutdown
     {
         vars.Log("Restoring memory");
         foreach (IDictionary<string, object> hook in vars.hooks){
+            if(((bool)hook["enabled"]) == false){
+                continue;
+            }
             var bytes = game.ReadBytes((IntPtr)hook["origPtr"], (int)hook["overwriteBytes"]);
             game.WriteBytes((IntPtr)hook["injectPtr"], bytes);
-            if ((string)hook["name"] == "NewGame"){
-                game.WriteBytes(((IntPtr)hook["injectPtr"]) + 6, (byte[])vars.newGame.origCmpBytes);
-            }
         }
         vars.Log("Memory restored");
     }
