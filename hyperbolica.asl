@@ -1,15 +1,15 @@
 state("Hyperbolica")
 {
     // This boolean is set to true when the player clicks 'new game'
-    bool buttonClicked : "GameAssembly.dll", 0x00C1F5C8, 0xB8, 0x0, 0x70, 0x10, 0x1E0, 0x2D0, 0x138;
+    bool buttonClicked : "GameAssembly.dll", 0x00DD4648, 0xB8, 0x0, 0x70, 0x10, 0x1E0, 0x2D0, 0x138;
 
-    int numCrystals : "GameAssembly.dll", 0x00C7F238, 0x760, 0x80, 0x310, 0x70, 0x1D0;
+    int numCrystals : "GameAssembly.dll", 0x00DFA0B8, 0x760, 0x80, 0x310, 0x70, 0x1D0;
 
     // Number of trinkets collected since launching the game
-    int numTrinkets : "GameAssembly.dll", 0x00C17888, 0xB8, 0x0, 0x200, 0x10, 0xF0, 0xF0, 0xC0;
+    int numTrinkets : "GameAssembly.dll", 0x00DCA2C8, 0xB8, 0x0, 0x200, 0x10, 0xF0, 0xF0, 0xC0;
 
     // True once the lever is pulled
-    bool leverPulled : "GameAssembly.dll", 0x00C72E98, 0x150, 0x248, 0x20, 0x28, 0x20, 0xA0, 0x1BD;
+    bool leverPulled : "GameAssembly.dll", 0x00D808D8, 0x150, 0x248, 0x20, 0x28, 0x20, 0xA0, 0x1BD;
 
     bool isLoading : "UnityPlayer.dll", 0x019E6CC0, 0x0, 0x208, 0x10, 0x520;
 }
@@ -24,8 +24,6 @@ startup
     settings.Add("splitMap", false, "Split on first trinket collection");
     settings.SetToolTip("splitMap", "This will be the map in an any% run");
     settings.Add("splitTrinket", false, "Split on any trinket collection");
-    settings.Add("splitSubEnter", false, "Split on entering a subarea");
-    settings.Add("splitSubExit", false, "Split on exiting a subarea");
 
 }
 
