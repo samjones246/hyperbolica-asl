@@ -58,11 +58,11 @@ split
 
     // Split on trinket collection
     if (current.numTrinkets == old.numTrinkets + 1){
-        if (settings["splitTrinket"] || settings["splitMap"] && vars.trinkets == 0){
+        if (settings["splitTrinket"] || (settings["splitMap"] && vars.trinkets == 0)){
             vars.Log("Trinkets increased from " + vars.trinkets + " to " + vars.trinkets + 1 + ", splitting");
+            vars.trinkets++;
             return true;
         }
-        vars.trinkets++;
     }
 
     // Split when lever pulled after boss fight
