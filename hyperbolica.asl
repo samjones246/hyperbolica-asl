@@ -1,7 +1,5 @@
 state("Hyperbolica")
 {
-       // This boolean is set to true when the player clicks 'new game'
-    bool buttonClicked : "GameAssembly.dll", 0x00DD4648, 0xB8, 0x0, 0x70, 0x10, 0x1E0, 0x2D0, 0x138;
 
     int numCrystals : "GameAssembly.dll", 0x00DFA0B8, 0x760, 0x80, 0x310, 0x70, 0x1D0;
 
@@ -28,7 +26,6 @@ startup
             }
             p.FreeMemory((IntPtr)hook["outputPtr"]);
             p.FreeMemory((IntPtr)hook["funcPtr"]);
-            p.FreeMemory((IntPtr)hook["origPtr"]);
         }
     });
 
@@ -36,31 +33,36 @@ startup
         (vars.loadLevel = new ExpandoObject()),
         (vars.newGame = new ExpandoObject()),
         //(vars.leverInteract = new ExpandoObject()),
-        //(vars.trinketCollect = new ExpandoObject())
+        (vars.trinketCollect = new ExpandoObject())
     };
 
     vars.loadLevel.name = "LoadLevel";
-    vars.loadLevel.pattern = "D7 FF CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 48 89 5C 24 10";
-    vars.loadLevel.outputSize = 0x08;
-    vars.loadLevel.patternOffset = 0x11;
-    vars.loadLevel.overwriteBytes = 15;
-    vars.loadLevel.payload = new byte[] { 0x48, 0x89, 0x0A };
+    vars.loadLevel.offset = 0x420240;
+    vars.loadLevel.caveOffset = 0x471;
+    vars.loadLevel.outputSize = 8;
+    vars.loadLevel.overwriteBytes = 5;
+    vars.loadLevel.payload = new byte[] { 0x48, 0x89, 0x08 }; // mov [rax], rcx
     vars.loadLevel.enabled = true;
 
     vars.newGame.name = "NewGame";
-    vars.newGame.pattern = "40 53 48 83 EC 30 80 3D 1C 3A 59 00 00";
-    vars.newGame.outputSize = 0x01;
-    vars.newGame.patternOffset = 0x00;
-    vars.newGame.overwriteBytes = 13;
-    vars.newGame.payload = new byte[] { 0xC7, 0x02, 0x01, 0x00, 0x00, 0x00 };
-    //vars.newGame.payload = new byte[] { 0x90 };
-    vars.newGame.enabled = false;
+    vars.newGame.offset = 0x715CD0;
+    vars.newGame.caveOffset = 0x992;
+    vars.newGame.outputSize = 1;
+    vars.newGame.overwriteBytes = 6;
+     // mov dword ptr [rax], 1
+    vars.newGame.payload = new byte[] { 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00 };
+    vars.newGame.enabled = true;
 
-    //vars.leverInteract.pattern = "";
-    //vars.newGame.outputType = typeof(bool);
-
-    //vars.trinketCollect.pattern = "";
-    //vars.newGame.outputType = typeof(bool);
+    vars.trinketCollect.name = "TrinketCollect";
+    vars.trinketCollect.offset = 0xA34B00;
+    vars.trinketCollect.caveOffset = 0x90;
+    vars.trinketCollect.outputSize = 12;
+    vars.trinketCollect.overwriteBytes = 5;
+    vars.trinketCollect.payload = new byte[] {
+        0x48, 0x89, 0x08, // mov [rax], rcx
+        0x89, 0x50, 0x08 // mov [rax+8], edx
+    }; 
+    vars.trinketCollect.enabled = true;
 
     // Create settings
     settings.Add("splitCrystal", true, "Split on crystal collection");
@@ -78,6 +80,21 @@ startup
         "Gallery"
     };
 
+    var crystals = new string[] {
+        "tetrahedron1",
+        "tetrahedron2",
+        "tetrahedron3",
+        "tetrahedron4",
+        "tetrahedron5",
+    }
+
+    var trinkets = new string[] {
+        "map", "watch", "", "", "",
+        "", "", "", "", "horseshoe",
+        "", "", "", "", "",
+        "spoon", "", "", "", "",
+    }
+
     vars.isSubarea = (Func<string, bool>)(name => {
         return Array.Exists(subareas, e => e == name);
     });
@@ -88,6 +105,16 @@ startup
 
     vars.leftSubarea = (Func<bool>)(() => {
         return vars.sceneNameNew == "Over" && vars.isSubarea(vars.sceneNameOld);
+    });
+
+    vars.readString = (Func<IntPtr, Process, string>)((ptr, p) => {
+        int length = p.ReadValue<int>(ptr+0x10);
+        char[] nameChars = new char[length];
+        for (int i=0;i<length;i++){
+            IntPtr charPtr = ptr + 0x14 + (i * 2);
+            nameChars[i] = p.ReadValue<char>(charPtr);
+        }
+        return new String(nameChars);
     });
 
 }
@@ -119,39 +146,52 @@ init {
             continue;
         }
         vars.Log("Installing hook for " + hook["name"]);
-        // AOB Scan to find injection point
-        SigScanTarget target = new SigScanTarget(0, (string)hook["pattern"]);
-        if ((IntPtr)(hook["injectPtr"] = scanner.Scan(target)) == IntPtr.Zero) {
-            throw new Exception("[Hyperbolica ASL] Signature not matched for " + hook["name"]);
-        }
-        hook["injectPtr"] = (IntPtr)hook["injectPtr"] + (int)hook["patternOffset"];
+
+        // Get pointer to function
+        hook["injectPtr"] = gameAssembly.BaseAddress + (int)hook["offset"];
+
+        // Get pointer to cave
+        hook["cavePtr"] = (IntPtr)hook["injectPtr"] + (int)hook["caveOffset"];
 
         // Allocate memory for output
         hook["outputPtr"] = game.AllocateMemory((int)hook["outputSize"]);
 
         // Build the hook function
-        var funcBytes = new List<byte>() {
-            0x52,      // push rdx
-            0x48, 0xBA // mov rdx, outputPtr
-        };
-        funcBytes.AddRange(BitConverter.GetBytes((UInt64)((IntPtr)hook["outputPtr"])));
+        var funcBytes = new List<byte>() { 0x48, 0xB8 }; // mov rax, ...
+        funcBytes.AddRange(BitConverter.GetBytes((UInt64)((IntPtr)hook["outputPtr"]))); // ...outputPtr
         funcBytes.AddRange((byte[])hook["payload"]);
-        funcBytes.Add(0x5A); // pop rdx
 
         // Allocate memory to store the function
-        hook["funcPtr"] = game.AllocateMemory(funcBytes.Count + 12);
+        hook["funcPtr"] = game.AllocateMemory(funcBytes.Count + (int)hook["overwriteBytes"] + 12);
         
         // Write the detour: Injection point -> hook function -> orignal code -> injection point + 1
         game.Suspend();
         try {
-            // The address where a copy of the overwritten code is stored
-            hook["origPtr"] = game.WriteDetour((IntPtr)hook["injectPtr"], (int)hook["overwriteBytes"], (IntPtr)hook["funcPtr"]);
+            // Copy the bytes which will be overwritten
+            byte[] overwritten = game.ReadBytes((IntPtr)hook["injectPtr"], (int)hook["overwriteBytes"]);
+
+            // Write short jump to code cave
+            List<byte> caveJump = new List<byte>() { 0xE9 }; // jmp ...
+            caveJump.AddRange(BitConverter.GetBytes((int)hook["caveOffset"] - 5)); // ...caveOffset - 5
+            game.WriteBytes((IntPtr)hook["injectPtr"], caveJump.ToArray());
+            hook["origBytes"] = overwritten;
+
+            // NOP out excess bytes
+            for(int i=0;i<(int)hook["overwriteBytes"]-5;i++){
+                game.WriteBytes((IntPtr)hook["injectPtr"] + 5 + i, new byte[] { 0x90 });
+            }
+
+            // Write jump to hook function in code cave
+            game.WriteJumpInstruction((IntPtr)hook["cavePtr"], (IntPtr)hook["funcPtr"]);
             
             // Write the hook function
             game.WriteBytes((IntPtr)hook["funcPtr"], funcBytes.ToArray());
 
-            // Write the jump hook function to original code
-            game.WriteJumpInstruction((IntPtr)hook["funcPtr"] + funcBytes.Count, (IntPtr)hook["origPtr"]);
+            // Write the overwritten code
+            game.WriteBytes((IntPtr)hook["funcPtr"] + funcBytes.Count, overwritten);
+
+            // Write the jump to the original function
+            game.WriteJumpInstruction((IntPtr)hook["funcPtr"] + funcBytes.Count + (int)hook["overwriteBytes"], (IntPtr)hook["injectPtr"] + (int)hook["overwriteBytes"]);
         }
         catch {
             vars.FreeMemory(game);
@@ -167,45 +207,51 @@ init {
         vars.Log("Output: " + ((IntPtr)hook["outputPtr"]).ToString("X"));
         vars.Log("Injection: " + ((IntPtr)hook["injectPtr"]).ToString("X") + " (GameAssembly.dll+" + offset.ToString("X") + ")");
         vars.Log("Function: " + ((IntPtr)hook["funcPtr"]).ToString("X"));
-        vars.Log("Original: " + ((IntPtr)hook["origPtr"]).ToString("X"));
     }
 
-    vars.sceneNameOld = "Unknown";
-    vars.sceneNameNew = "Unknown"; 
+    vars.Watchers = new MemoryWatcherList
+    {
+        (vars.loadLevel.output = new MemoryWatcher<IntPtr>((IntPtr)vars.loadLevel.outputPtr)),
+        (vars.newGame.output = new MemoryWatcher<bool>((IntPtr)vars.newGame.outputPtr)),
+        (vars.trinketCollect.output1 = new MemoryWatcher<IntPtr>((IntPtr)vars.trinketCollect.outputPtr)),
+        (vars.trinketCollect.output2 = new MemoryWatcher<int>((IntPtr)vars.trinketCollect.outputPtr + 0x8)),  
+    };
 
-    vars.sceneNamePtrOld = IntPtr.Zero;
-    vars.sceneNamePtrNew = IntPtr.Zero;
+    vars.sceneNameOld = "Unknown";
+    vars.sceneNameNew = "Unknown";
+
+    vars.stateKeyOld = "";
+    vars.stateKeyNew = "";
 }
 
 update
-{
-    // Get pointer to destination scene name from dump location
-    vars.sceneNamePtrOld = vars.sceneNamePtrNew;
+{   
+    vars.Watchers.UpdateAll(game);
+
+    // Update scene name from dumkped pointer
     vars.sceneNameOld = vars.sceneNameNew;
-    vars.sceneNamePtrNew = game.ReadValue<IntPtr>((IntPtr)vars.loadLevel.outputPtr);
-    if (vars.sceneNamePtrOld == vars.sceneNamePtrNew){
-        return;
-    }
-    if (vars.sceneNamePtrNew != IntPtr.Zero){ 
-        // Read string length, then read that many characters
-        int length = game.ReadValue<int>((IntPtr)vars.sceneNamePtrNew+0x10);
-        char[] nameChars = new char[length];
-        for (int i=0;i<length;i++){
-            IntPtr charPtr = vars.sceneNamePtrNew + 0x14 + (i * 2);
-            nameChars[i] = game.ReadValue<char>(charPtr);
-        }
-        // Put chars together to form the string
-        vars.sceneNameNew = new String(nameChars);
+    if (vars.loadLevel.output.Current != vars.loadLevel.output.Old) {
+        vars.sceneNameNew = vars.readString(vars.loadLevel.output.Current, game);
     }
     if (vars.sceneNameNew != vars.sceneNameOld){
         vars.Log("Transitioning from '" + vars.sceneNameOld + "' to '" + vars.sceneNameNew + "'");
     }
+
+    // Get latest state update
+    vars.stateKeyOld = vars.stateKeyNew;
+    if (vars.trinketCollect.output1.Current != vars.trinketCollect.output1.Old) {
+        vars.stateKeyNew = vars.readString(vars.trinketCollect.output1.Current, game);
+    }
+    if (vars.stateKeyNew != vars.stateKeyOld){
+        vars.Log("State updated: " + vars.stateKeyNew + ", " + vars.trinketCollect.output2.Current);
+    }
 }
 
 start {
-    // When buttonClicked becomes true, start the timer
-    if (current.buttonClicked && !old.buttonClicked){
+    // When NewGame called, start the timer
+    if (vars.newGame.output.Current && !vars.newGame.output.Old){
         vars.Log("Starting Timer");
+        game.WriteBytes((IntPtr)vars.newGame.outputPtr, new byte[] { 0x00, 0x00, 0x00, 0x00 });
         return true;
     }
     return false;
@@ -267,8 +313,14 @@ shutdown
             if(((bool)hook["enabled"]) == false){
                 continue;
             }
-            var bytes = game.ReadBytes((IntPtr)hook["origPtr"], (int)hook["overwriteBytes"]);
-            game.WriteBytes((IntPtr)hook["injectPtr"], bytes);
+            // Restore overwritten bytes
+            game.WriteBytes((IntPtr)hook["injectPtr"], (byte[])hook["origBytes"]);
+
+            // Remove jmp from code cave
+            for(int i=0;i<12;i++){
+                game.WriteBytes((IntPtr)hook["cavePtr"] + i, new byte[] { 0xCC });
+            }
+
         }
         vars.Log("Memory restored");
     }
