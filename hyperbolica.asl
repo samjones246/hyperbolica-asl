@@ -98,7 +98,18 @@ init {
     // Trinkets collected during current run
     vars.trinkets = 0;
 
-    var gameAssembly = modules[41];
+    // Find GameAssembly.dll
+    ProcessModuleWow64Safe gameAssembly = null;
+    foreach (ProcessModuleWow64Safe module in modules){
+        if(module.ModuleName == "GameAssembly.dll"){
+            gameAssembly = module;
+            break;
+        }
+    }
+    if (gameAssembly == null) {
+        throw new Exception("GameAssembly.dll not found");
+    }
+    vars.Log("GameAssembly.dll found");
     var scanner = new SignatureScanner(game, gameAssembly.BaseAddress, gameAssembly.ModuleMemorySize);
 
     // Install hooks
@@ -150,8 +161,11 @@ init {
             game.Resume();
         }
 
+        // Calcuate offset of injection point from module base address
+        UInt64 offset = (UInt64)((IntPtr)hook["injectPtr"]) - (UInt64)gameAssembly.BaseAddress;
+
         vars.Log("Output: " + ((IntPtr)hook["outputPtr"]).ToString("X"));
-        vars.Log("Injection: " + ((IntPtr)hook["injectPtr"]).ToString("X"));
+        vars.Log("Injection: " + ((IntPtr)hook["injectPtr"]).ToString("X") + " (GameAssembly.dll+" + offset.ToString("X") + ")");
         vars.Log("Function: " + ((IntPtr)hook["funcPtr"]).ToString("X"));
         vars.Log("Original: " + ((IntPtr)hook["origPtr"]).ToString("X"));
     }
