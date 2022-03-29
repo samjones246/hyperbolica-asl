@@ -87,12 +87,12 @@ startup
     };
 
     vars.crystalNames = new string[] {
-        "tetrahedron",  
-        "cube",         // Maze
-        "octahedron",   // Snow
-        "dodecahedron",  
-        "icosahedron",  // Gallery
-        "teapot"        // Gallery (After all trinkets)
+        "tetrahedron",
+        "cube",
+        "octahedron",
+        "dodecahedron",
+        "icosahedron",
+        "teapot"
     };
 
     vars.trinketNames = new string[] {
@@ -283,11 +283,11 @@ split
 {
     if (vars.stateKeyNew != vars.stateKeyOld){
         // Trinket collected
-        if (vars.stateKeyNew.Contains("has_trinket")){
+        if (vars.stateKeyNew.StartsWith("has_trinket")){
             string trinketName = vars.stateKeyNew.Split('_')[2];
             vars.Log("Trinket collected: " + trinketName);
 
-            if (vars.crystalNames.Contains(trinketName)){
+            if (((string[])vars.crystalNames).Contains(trinketName)){
                 if (settings["splitCrystal"]){
                     vars.Log("Crystal collected, splitting");
                     return true;
@@ -295,48 +295,41 @@ split
             }else if (settings["splitTrinket"]){
                 if (settings["splitTrinket_map"]){
                     if(trinketName == "map"){
-                        vars.Log("Trinket collected: " + trinketName + ", splitting");
+                        vars.Log("In map only mode, collected map, splitting");
                         return true;
+                    }else{
+                        vars.Log("In map only mode, not splitting");
                     }
                 }
-                else if (vars.temporaryTrinketNames.Contains(trinketName)) {
-                    if(settings["splitTrinket_temporary"]){
-                        vars.Log("Trinket collected: " + trinketName + ", splitting");
+                else if (((string[])vars.temporaryTrinketNames).Contains(trinketName)) {
+                    if(settings["splitTrinket_temp"]){
+                        vars.Log("Temporary trinkets allowed, splitting");
                         return true;
+                    }else{
+                        vars.Log("Temporary trinket, not splitting");
                     }
                 }
                 else{
-                    vars.Log("Trinket collected: " + trinketName + ", splitting");
+                    vars.Log("Trinket collected, splitting");
+                    return true;
                 }
             }
         }
         if(vars.stateKeyNew == "intro" + (vars.vtuberStage + 1) + "_vtuber_yes"){
+            vars.Log("Vtuber stage completed");
+            vars.vtuberStage++;
             if (settings["splitQuest_vtuber"]){
                 vars.Log("Quest progress: vtuber, splitting");
                 return true;
             }
         }
         if(vars.stateKeyNew == "intro" + (vars.daisyStage + 1) + "_daisy_yes"){
+            vars.Log("Daisy stage completed");
+            vars.daisyStage++;
             if (settings["splitQuest_daisy"]){
                 vars.Log("Quest progress: daisy, splitting");
                 return true;
             }
-        }
-    }
-
-    // Split when number of crystals obtained increases
-    if (settings["splitCrystal"] && current.numCrystals == vars.crystals + 1){
-        vars.Log("Crystals increased from " + vars.crystals + " to " + current.numCrystals + ", splitting");
-        vars.crystals++;
-        return true;
-    }
-
-    // Split on trinket collection
-    if (current.numTrinkets == old.numTrinkets + 1){
-        if (settings["splitTrinket"] || (settings["splitMap"] && vars.trinkets == 0)){
-            vars.Log("Trinkets increased from " + vars.trinkets + " to " + vars.trinkets + 1 + ", splitting");
-            vars.trinkets++;
-            return true;
         }
     }
 
