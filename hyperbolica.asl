@@ -66,9 +66,15 @@ startup
 
     // Create settings
     settings.Add("splitCrystal", true, "Split on crystal collection");
-    settings.Add("splitMap", false, "Split on first trinket collection");
-    settings.SetToolTip("splitMap", "This will be the map in an any% run");
-    settings.Add("splitTrinket", false, "Split on any trinket collection");
+
+    settings.Add("splitTrinket", true, "Split on trinket collection");
+    settings.Add("splitTrinket_map", true, "Only Map", "splitTrinket");
+    settings.Add("splitTrinket_temp", false, "Include temporary trinkets", "splitTrinket");
+
+    settings.Add("splitQuest", false, "Split on side quest progress");
+    settings.Add("splitQuest_vtuber", true, "SuperGuy137", "splitQuest");
+    settings.Add("splitQuest_daisy", true, "Iris", "splitQuest");
+
     settings.Add("splitSubEnter", false, "Split on entering a subarea");
     settings.Add("splitSubExit", false, "Split on exiting a subarea");
 
@@ -77,23 +83,30 @@ startup
         "Farm",
         "Snow",
         "Maze",
-        "Gallery"
+        "Gallery" 
     };
 
-    var crystals = new string[] {
-        "tetrahedron1",
-        "tetrahedron2",
-        "tetrahedron3",
-        "tetrahedron4",
-        "tetrahedron5",
-    }
+    vars.crystalNames = new string[] {
+        "tetrahedron",  
+        "cube",         // Maze
+        "octahedron",   // Snow
+        "dodecahedron",  
+        "icosahedron",  // Gallery
+        "teapot"        // Gallery (After all trinkets)
+    };
 
-    var trinkets = new string[] {
-        "map", "watch", "", "", "",
-        "", "", "", "", "horseshoe",
-        "", "", "", "", "",
-        "spoon", "", "", "", "",
-    }
+    vars.trinketNames = new string[] {
+        "map",      "watch",      "microphone", "rose",       "hypercube",
+        "squeegee", "calculator", "beanie",     "sanddollar", "horseshoe",
+        "tack",     "jam",        "mug",        "cereal",     "yoyo",
+        "spoon",    "needles",    "chocolate",  "playbutton", "newtonscradle",
+    };
+
+    vars.temporaryTrinketNames = new string[] {
+        "blueprints", "tools", "note", "key", // -> Octahedron
+        "ticket",                             // -> Icosahedron
+        "hat"                                 // -> Jam
+    };
 
     vars.isSubarea = (Func<string, bool>)(name => {
         return Array.Exists(subareas, e => e == name);
@@ -122,8 +135,13 @@ startup
 init {
     // Seems to be some volatility in numCrystals pointer during loads, stable copy of last known value to fix
     vars.crystals = 0;
+
     // Trinkets collected during current run
     vars.trinkets = 0;
+
+    // Track sidequest progress
+    vars.vtuberStage = 0;
+    vars.daisyStage = 0;
 
     // Find GameAssembly.dll
     ProcessModuleWow64Safe gameAssembly = null;
@@ -263,6 +281,49 @@ isLoading{
 
 split
 {
+    if (vars.stateKeyNew != vars.stateKeyOld){
+        // Trinket collected
+        if (vars.stateKeyNew.Contains("has_trinket")){
+            string trinketName = vars.stateKeyNew.Split('_')[2];
+            vars.Log("Trinket collected: " + trinketName);
+
+            if (vars.crystalNames.Contains(trinketName)){
+                if (settings["splitCrystal"]){
+                    vars.Log("Crystal collected, splitting");
+                    return true;
+                }
+            }else if (settings["splitTrinket"]){
+                if (settings["splitTrinket_map"]){
+                    if(trinketName == "map"){
+                        vars.Log("Trinket collected: " + trinketName + ", splitting");
+                        return true;
+                    }
+                }
+                else if (vars.temporaryTrinketNames.Contains(trinketName)) {
+                    if(settings["splitTrinket_temporary"]){
+                        vars.Log("Trinket collected: " + trinketName + ", splitting");
+                        return true;
+                    }
+                }
+                else{
+                    vars.Log("Trinket collected: " + trinketName + ", splitting");
+                }
+            }
+        }
+        if(vars.stateKeyNew == "intro" + (vars.vtuberStage + 1) + "_vtuber_yes"){
+            if (settings["splitQuest_vtuber"]){
+                vars.Log("Quest progress: vtuber, splitting");
+                return true;
+            }
+        }
+        if(vars.stateKeyNew == "intro" + (vars.daisyStage + 1) + "_daisy_yes"){
+            if (settings["splitQuest_daisy"]){
+                vars.Log("Quest progress: daisy, splitting");
+                return true;
+            }
+        }
+    }
+
     // Split when number of crystals obtained increases
     if (settings["splitCrystal"] && current.numCrystals == vars.crystals + 1){
         vars.Log("Crystals increased from " + vars.crystals + " to " + current.numCrystals + ", splitting");
