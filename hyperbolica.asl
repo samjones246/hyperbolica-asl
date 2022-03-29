@@ -1,12 +1,6 @@
 state("Hyperbolica")
 {
-
-    int numCrystals : "GameAssembly.dll", 0x00DFA0B8, 0x760, 0x80, 0x310, 0x70, 0x1D0;
-
-    // Number of trinkets collected since launching the game
-    int numTrinkets : "GameAssembly.dll", 0x00DCA2C8, 0xB8, 0x0, 0x200, 0x10, 0xF0, 0xF0, 0xC0;
-
-    // True once the lever is pulled
+    // True once the lever is pulled at the end of the NIL fight
     bool leverPulled : "GameAssembly.dll", 0x00D808D8, 0x150, 0x248, 0x20, 0x28, 0x20, 0xA0, 0x1BD;
 
     bool isLoading : "UnityPlayer.dll", 0x019E6CC0, 0x0, 0x208, 0x10, 0x520;
@@ -49,8 +43,7 @@ startup
     vars.newGame.caveOffset = 0x992;
     vars.newGame.outputSize = 1;
     vars.newGame.overwriteBytes = 6;
-     // mov dword ptr [rax], 1
-    vars.newGame.payload = new byte[] { 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00 };
+    vars.newGame.payload = new byte[] { 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00 }; // mov dword ptr [rax], 1
     vars.newGame.enabled = true;
 
     vars.trinketCollect.name = "TrinketCollect";
@@ -120,6 +113,7 @@ startup
         return vars.sceneNameNew == "Over" && vars.isSubarea(vars.sceneNameOld);
     });
 
+    // Read a System.String from a location in memory
     vars.readString = (Func<IntPtr, Process, string>)((ptr, p) => {
         int length = p.ReadValue<int>(ptr+0x10);
         char[] nameChars = new char[length];
@@ -133,12 +127,6 @@ startup
 }
 
 init {
-    // Seems to be some volatility in numCrystals pointer during loads, stable copy of last known value to fix
-    vars.crystals = 0;
-
-    // Trinkets collected during current run
-    vars.trinkets = 0;
-
     // Track sidequest progress
     vars.vtuberStage = 0;
     vars.daisyStage = 0;
@@ -155,7 +143,6 @@ init {
         throw new Exception("GameAssembly.dll not found");
     }
     vars.Log("GameAssembly.dll found");
-    var scanner = new SignatureScanner(game, gameAssembly.BaseAddress, gameAssembly.ModuleMemorySize);
 
     // Install hooks
     foreach (IDictionary<string, object> hook in vars.hooks)
@@ -182,7 +169,13 @@ init {
         // Allocate memory to store the function
         hook["funcPtr"] = game.AllocateMemory(funcBytes.Count + (int)hook["overwriteBytes"] + 12);
         
-        // Write the detour: Injection point -> hook function -> orignal code -> injection point + 1
+        // Write the detour: 
+        // - Copy bytes from the start of original function which will be overwritten
+        // - Overwrite those bytes with a 5 byte jump instruction to a nearby code cave
+        // - In the code cave, write a 12 byte jump to the memory allocated for our hook function
+        // - Write the hook function
+        // - Write a copy of the overwritten code at the end of the hook function
+        // - Following this, write a jump back the original function
         game.Suspend();
         try {
             // Copy the bytes which will be overwritten
@@ -246,7 +239,7 @@ update
 {   
     vars.Watchers.UpdateAll(game);
 
-    // Update scene name from dumkped pointer
+    // Update scene name from dumped pointer
     vars.sceneNameOld = vars.sceneNameNew;
     if (vars.loadLevel.output.Current != vars.loadLevel.output.Old) {
         vars.sceneNameNew = vars.readString(vars.loadLevel.output.Current, game);
@@ -287,12 +280,15 @@ split
             string trinketName = vars.stateKeyNew.Split('_')[2];
             vars.Log("Trinket collected: " + trinketName);
 
+            // This is a crystal
             if (((string[])vars.crystalNames).Contains(trinketName)){
                 if (settings["splitCrystal"]){
                     vars.Log("Crystal collected, splitting");
                     return true;
                 }
-            }else if (settings["splitTrinket"]){
+            }
+            else if (settings["splitTrinket"]){
+                // Map only mode is on
                 if (settings["splitTrinket_map"]){
                     if(trinketName == "map"){
                         vars.Log("In map only mode, collected map, splitting");
@@ -301,6 +297,8 @@ split
                         vars.Log("In map only mode, not splitting");
                     }
                 }
+
+                // This is a temporary trinket
                 else if (((string[])vars.temporaryTrinketNames).Contains(trinketName)) {
                     if(settings["splitTrinket_temp"]){
                         vars.Log("Temporary trinkets allowed, splitting");
@@ -309,12 +307,16 @@ split
                         vars.Log("Temporary trinket, not splitting");
                     }
                 }
+
+                // This is a regular trinket
                 else{
                     vars.Log("Trinket collected, splitting");
                     return true;
                 }
             }
         }
+
+        // SuperGuy137 sidequest progressed
         if(vars.stateKeyNew == "intro" + (vars.vtuberStage + 1) + "_vtuber_yes"){
             vars.Log("Vtuber stage completed");
             vars.vtuberStage++;
@@ -323,6 +325,8 @@ split
                 return true;
             }
         }
+
+        // Iris sidequest progressed
         if(vars.stateKeyNew == "intro" + (vars.daisyStage + 1) + "_daisy_yes"){
             vars.Log("Daisy stage completed");
             vars.daisyStage++;
@@ -345,11 +349,11 @@ split
         return true;
     }
 
+    // Split on exiting a sub area
     if (settings["splitSubExit"] && vars.leftSubarea()){
         vars.Log("Leaving subarea, splitting");
         return true;
     }
-
 
     return false;
 }
