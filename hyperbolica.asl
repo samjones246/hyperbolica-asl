@@ -338,9 +338,9 @@ split
     }
 
     // Split when lever pulled after boss fight
-    if (vars.crystals >= 5 && !old.leverPulled && current.leverPulled) {
+    if (vars.sceneNameNew == "Glitch" && !old.leverPulled && current.leverPulled) {
         vars.Log("Lever pulled, splitting");
-        return true;
+        return true; 
     }
 
     // Split on entering sub area
