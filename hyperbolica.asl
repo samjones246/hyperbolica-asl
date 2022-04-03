@@ -73,7 +73,7 @@ startup
     settings.Add("splitSubEnter", false, "Split on entering a subarea");
     settings.SetToolTip("splitSubEnter", "Cafe, farm, frosted fields, maze and NEMO");
     settings.Add("splitSubExit", false, "Split on exiting a subarea");
-    settings.SetToolTip("splitSubLeave", "Cafe, farm, frosted fields, maze and NEMO");
+    settings.SetToolTip("splitSubExit", "Cafe, farm, frosted fields, maze and NEMO");
 
     var subareas = new string[] {
         "Cafe",
