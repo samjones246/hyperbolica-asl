@@ -63,13 +63,16 @@ startup
     settings.Add("splitTrinket", true, "Split on trinket collection");
     settings.Add("splitTrinket_map", true, "Only Map", "splitTrinket");
     settings.Add("splitTrinket_temp", false, "Include temporary trinkets", "splitTrinket");
+    settings.SetToolTip("splitTrinket_temp", "The hat, the NEMO ticket, and the blueprints/tools/note/key obtained in frosted fields.");
 
     settings.Add("splitQuest", false, "Split on side quest progress");
     settings.Add("splitQuest_vtuber", true, "SuperGuy137", "splitQuest");
     settings.Add("splitQuest_daisy", true, "Iris", "splitQuest");
 
     settings.Add("splitSubEnter", false, "Split on entering a subarea");
+    settings.SetToolTip("splitSubEnter", "Cafe, farm, frosted fields, maze and NEMO");
     settings.Add("splitSubExit", false, "Split on exiting a subarea");
+    settings.SetToolTip("splitSubLeave", "Cafe, farm, frosted fields, maze and NEMO");
 
     var subareas = new string[] {
         "Cafe",
