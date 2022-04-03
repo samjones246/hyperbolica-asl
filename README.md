@@ -25,4 +25,5 @@ If you want to contribute to the autosplitter, or to test changes on a branch ot
  - Load removal
 
 ## TODO
+ - Split on sub area enter/exit
  - Fix bugs

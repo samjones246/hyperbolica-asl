@@ -1,5 +1,6 @@
 state("Hyperbolica")
 {
+
     // True once the lever is pulled at the end of the NIL fight
     bool leverPulled : "GameAssembly.dll", 0x00D808D8, 0x150, 0x248, 0x20, 0x28, 0x20, 0xA0, 0x1BD;
 
@@ -328,7 +329,7 @@ split
                 return true;
             }
         }
-
+        
         // Iris sidequest progressed
         if(vars.stateKeyNew == "intro" + (vars.daisyStage + 1) + "_daisy_yes"){
             vars.Log("Daisy stage completed");
