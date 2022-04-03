@@ -3,6 +3,7 @@ state("Hyperbolica")
     // This boolean is set to true when the player clicks 'new game'
     bool buttonClicked : "GameAssembly.dll", 0x00DD4648, 0xB8, 0x0, 0x70, 0x10, 0x1E0, 0x2D0, 0x138;
 
+    // Numer of crystals collected since launching the game
     int numCrystals : "GameAssembly.dll", 0x00DFA0B8, 0x760, 0x80, 0x310, 0x70, 0x1D0;
 
     // Number of trinkets collected since launching the game
@@ -30,14 +31,16 @@ startup
 init {
     // Seems to be some volatility in numCrystals pointer during loads, stable copy of last known value to fix
     vars.crystals = 0;
-    // Trinkets collected during current run
-    vars.trinkets = 0;
+    // Initialize trinket count
+    vars.trinkets = 0; 
 }
 
 start {
     // When buttonClicked becomes true, start the timer
     if (current.buttonClicked && !old.buttonClicked){
         vars.Log("Starting Timer");
+        // Reinitialize trinket count
+        vars.trinkets = 0; 
         return true;
     }
     return false;
