@@ -104,7 +104,7 @@ startup
     };
 
     vars.temporaryTrinketNames = new string[] {
-        "blueprints", "tools", "note", "key", // -> Octahedron
+        "blueprints", "tools", "note", "key", // -> Dodecahedron
         "ticket",                             // -> Icosahedron
         "hat"                                 // -> Jam
     };
