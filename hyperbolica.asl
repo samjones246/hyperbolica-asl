@@ -33,7 +33,6 @@ startup
 
     vars.loadLevel.name = "LoadLevel";
     vars.loadLevel.offset = 0x420240;
-    vars.loadLevel.caveOffset = 0x471;
     vars.loadLevel.outputSize = 8;
     vars.loadLevel.overwriteBytes = 5;
     vars.loadLevel.payload = new byte[] { 0x48, 0x89, 0x08 }; // mov [rax], rcx
@@ -41,7 +40,6 @@ startup
 
     vars.newGame.name = "NewGame";
     vars.newGame.offset = 0x715CD0;
-    vars.newGame.caveOffset = 0x992;
     vars.newGame.outputSize = 1;
     vars.newGame.overwriteBytes = 6;
     vars.newGame.payload = new byte[] { 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00 }; // mov dword ptr [rax], 1
@@ -49,7 +47,6 @@ startup
 
     vars.trinketCollect.name = "TrinketCollect";
     vars.trinketCollect.offset = 0xA34B00;
-    vars.trinketCollect.caveOffset = 0x90;
     vars.trinketCollect.outputSize = 12;
     vars.trinketCollect.overwriteBytes = 5;
     vars.trinketCollect.payload = new byte[] {
@@ -163,8 +160,28 @@ init {
         // Get pointer to function
         hook["injectPtr"] = gameAssembly.BaseAddress + (int)hook["offset"];
 
-        // Get pointer to cave
-        hook["cavePtr"] = (IntPtr)hook["injectPtr"] + (int)hook["caveOffset"];
+        // Find nearby 12 byte code cave to store long jmp
+        int caveSize = 0;
+        int dist = 0;
+        hook["cavePtr"] = IntPtr.Zero;
+        vars.Log("Scanning for code cave");
+        for(int i=1;i<0xFFFFFFFF;i++){
+            byte b = game.ReadBytes((IntPtr)hook["injectPtr"] + i, 1)[0];
+            if (b == 0xCC){
+                caveSize++;
+                if (caveSize == 12){
+                    hook["caveOffset"] = i - 11;
+                    hook["cavePtr"] = (IntPtr)hook["injectPtr"] + (int)hook["caveOffset"];
+                    break;
+                }
+            }else{
+                caveSize = 0;
+            }
+        }
+        if ((IntPtr)hook["cavePtr"] == IntPtr.Zero){
+            throw new Exception("Unable to locate nearby code cave");
+        }
+        vars.Log("Found cave " + ((int)hook["caveOffset"]).ToString("X") + " bytes away");
 
         // Allocate memory for output
         hook["outputPtr"] = game.AllocateMemory((int)hook["outputSize"]);
