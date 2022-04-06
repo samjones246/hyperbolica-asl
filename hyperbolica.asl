@@ -9,7 +9,7 @@ state("Hyperbolica")
 
 startup
 {
-    // For logging (duh) 
+    // For logging (duh)
     vars.Log = (Action<object>)((output) => print("[Hyperbolica ASL] " + output));
 
     // Function for deallocating memory used by this process
@@ -55,7 +55,7 @@ startup
     vars.trinketCollect.payload = new byte[] {
         0x48, 0x89, 0x08, // mov [rax], rcx
         0x89, 0x50, 0x08 // mov [rax+8], edx
-    }; 
+    };
     vars.trinketCollect.enabled = true;
 
     // Create settings
@@ -75,12 +75,16 @@ startup
     settings.Add("splitSubExit", false, "Split on exiting a subarea");
     settings.SetToolTip("splitSubExit", "Cafe, farm, frosted fields, maze and NEMO");
 
+    settings.Add("splitMisc", false, "Miscellaneous sub splits");
+    settings.Add("splitMisc_snowball", true, "Split on snowball fight won", "splitMisc");
+    settings.Add("splitMisc_nilfinal", false, "Split on NIL entering final phase", "splitMisc");
+
     var subareas = new string[] {
         "Cafe",
         "Farm",
         "Snow",
         "Maze",
-        "Gallery" 
+        "Gallery"
     };
 
     vars.crystalNames = new string[] {
@@ -100,7 +104,7 @@ startup
     };
 
     vars.temporaryTrinketNames = new string[] {
-        "blueprints", "tools", "note", "key", // -> Octahedron
+        "blueprints", "tools", "note", "key", // -> Dodecahedron
         "ticket",                             // -> Icosahedron
         "hat"                                 // -> Jam
     };
@@ -172,8 +176,8 @@ init {
 
         // Allocate memory to store the function
         hook["funcPtr"] = game.AllocateMemory(funcBytes.Count + (int)hook["overwriteBytes"] + 12);
-        
-        // Write the detour: 
+
+        // Write the detour:
         // - Copy bytes from the start of original function which will be overwritten
         // - Overwrite those bytes with a 5 byte jump instruction to a nearby code cave
         // - In the code cave, write a 12 byte jump to the memory allocated for our hook function
@@ -198,7 +202,7 @@ init {
 
             // Write jump to hook function in code cave
             game.WriteJumpInstruction((IntPtr)hook["cavePtr"], (IntPtr)hook["funcPtr"]);
-            
+
             // Write the hook function
             game.WriteBytes((IntPtr)hook["funcPtr"], funcBytes.ToArray());
 
@@ -229,7 +233,7 @@ init {
         (vars.loadLevel.output = new MemoryWatcher<IntPtr>((IntPtr)vars.loadLevel.outputPtr)),
         (vars.newGame.output = new MemoryWatcher<bool>((IntPtr)vars.newGame.outputPtr)),
         (vars.trinketCollect.output1 = new MemoryWatcher<IntPtr>((IntPtr)vars.trinketCollect.outputPtr)),
-        (vars.trinketCollect.output2 = new MemoryWatcher<int>((IntPtr)vars.trinketCollect.outputPtr + 0x8)),  
+        (vars.trinketCollect.output2 = new MemoryWatcher<int>((IntPtr)vars.trinketCollect.outputPtr + 0x8)),
     };
 
     vars.sceneNameOld = "Unknown";
@@ -240,7 +244,7 @@ init {
 }
 
 update
-{   
+{
     vars.Watchers.UpdateAll(game);
 
     // Update scene name from dumped pointer
@@ -329,7 +333,7 @@ split
                 return true;
             }
         }
-        
+
         // Iris sidequest progressed
         if(vars.stateKeyNew == "intro" + (vars.daisyStage + 1) + "_daisy_yes"){
             vars.Log("Daisy stage completed");
@@ -339,12 +343,30 @@ split
                 return true;
             }
         }
+
+        // Snowball fight completed
+        if (vars.stateKeyNew == "snow_fighter1_snowball_win") {
+            vars.Log("Snowball fight won");
+            if (settings["splitMisc_snowball"]) {
+                vars.Log("Snowball fight split enabled, splitting");
+                return true;
+            }
+        }
+
+        // NIL entering final phase
+        if (vars.stateKeyNew == "boss_last_stage") {
+            vars.Log("NIL last stage");
+            if (settings["splitMisc_nilfinal"]) {
+                vars.Log("NIL final phase split enabled, splitting");
+                return true;
+            }
+        }
     }
 
     // Split when lever pulled after boss fight
     if (vars.sceneNameNew == "Glitch" && !old.leverPulled && current.leverPulled) {
         vars.Log("Lever pulled, splitting");
-        return true; 
+        return true;
     }
 
     // Split on entering sub area
