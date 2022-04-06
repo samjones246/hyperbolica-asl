@@ -77,6 +77,7 @@ startup
 
     settings.Add("splitMisc", false, "Miscellaneous sub splits");
     settings.Add("splitMisc_snowball", true, "Split on snowball fight won", "splitMisc");
+    settings.Add("splitMisc_nilfinal", false, "Split on NIL entering final phase", "splitMisc");
 
     var subareas = new string[] {
         "Cafe",
@@ -348,6 +349,15 @@ split
             vars.Log("Snowball fight won");
             if (settings["splitMisc_snowball"]) {
                 vars.Log("Snowball fight split enabled, splitting");
+                return true;
+            }
+        }
+
+        // NIL entering final phase
+        if (vars.stateKeyNew == "boss_last_stage") {
+            vars.Log("NIL last stage");
+            if (settings["splitMisc_nilfinal"]) {
+                vars.Log("NIL final phase split enabled, splitting");
                 return true;
             }
         }
