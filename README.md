@@ -21,10 +21,10 @@ If you want to contribute to the autosplitter, or to test changes on a branch ot
    - All trinkets except temporary ones
    - All trinkets including temporary ones
  - Split on sub area enter/exit
+ - Split on snowball fight end
  - Final split on pulling lever after boss
  - Load removal
 
 ## TODO
- - Split on NIL phase change
- - Split on snowball fight end
+ - Split on NIL phase change (partially implemented)
  - Fix bugs
