@@ -75,6 +75,9 @@ startup
     settings.Add("splitSubExit", false, "Split on exiting a subarea");
     settings.SetToolTip("splitSubExit", "Cafe, farm, frosted fields, maze and NEMO");
 
+    settings.Add("splitMisc", false, "Miscellaneous sub splits");
+    settings.Add("splitMisc_snowball", true, "Split on snowball fight won", "splitMisc");
+
     var subareas = new string[] {
         "Cafe",
         "Farm",
@@ -336,6 +339,15 @@ split
             vars.daisyStage++;
             if (settings["splitQuest_daisy"]){
                 vars.Log("Quest progress: daisy, splitting");
+                return true;
+            }
+        }
+
+        // Snowball fight completed
+        if (vars.stateKeyNew == "snow_fighter1_snowball_win") {
+            vars.Log("Snowball fight won");
+            if (settings["splitMisc_snowball"]) {
+                vars.Log("Snowball fight split enabled, splitting");
                 return true;
             }
         }
