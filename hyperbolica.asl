@@ -9,7 +9,7 @@ state("Hyperbolica")
 
 startup
 {
-    // For logging (duh) 
+    // For logging (duh)
     vars.Log = (Action<object>)((output) => print("[Hyperbolica ASL] " + output));
 
     // Function for deallocating memory used by this process
@@ -55,7 +55,7 @@ startup
     vars.trinketCollect.payload = new byte[] {
         0x48, 0x89, 0x08, // mov [rax], rcx
         0x89, 0x50, 0x08 // mov [rax+8], edx
-    }; 
+    };
     vars.trinketCollect.enabled = true;
 
     // Create settings
@@ -80,7 +80,7 @@ startup
         "Farm",
         "Snow",
         "Maze",
-        "Gallery" 
+        "Gallery"
     };
 
     vars.crystalNames = new string[] {
@@ -172,8 +172,8 @@ init {
 
         // Allocate memory to store the function
         hook["funcPtr"] = game.AllocateMemory(funcBytes.Count + (int)hook["overwriteBytes"] + 12);
-        
-        // Write the detour: 
+
+        // Write the detour:
         // - Copy bytes from the start of original function which will be overwritten
         // - Overwrite those bytes with a 5 byte jump instruction to a nearby code cave
         // - In the code cave, write a 12 byte jump to the memory allocated for our hook function
@@ -198,7 +198,7 @@ init {
 
             // Write jump to hook function in code cave
             game.WriteJumpInstruction((IntPtr)hook["cavePtr"], (IntPtr)hook["funcPtr"]);
-            
+
             // Write the hook function
             game.WriteBytes((IntPtr)hook["funcPtr"], funcBytes.ToArray());
 
@@ -229,7 +229,7 @@ init {
         (vars.loadLevel.output = new MemoryWatcher<IntPtr>((IntPtr)vars.loadLevel.outputPtr)),
         (vars.newGame.output = new MemoryWatcher<bool>((IntPtr)vars.newGame.outputPtr)),
         (vars.trinketCollect.output1 = new MemoryWatcher<IntPtr>((IntPtr)vars.trinketCollect.outputPtr)),
-        (vars.trinketCollect.output2 = new MemoryWatcher<int>((IntPtr)vars.trinketCollect.outputPtr + 0x8)),  
+        (vars.trinketCollect.output2 = new MemoryWatcher<int>((IntPtr)vars.trinketCollect.outputPtr + 0x8)),
     };
 
     vars.sceneNameOld = "Unknown";
@@ -240,7 +240,7 @@ init {
 }
 
 update
-{   
+{
     vars.Watchers.UpdateAll(game);
 
     // Update scene name from dumped pointer
@@ -329,7 +329,7 @@ split
                 return true;
             }
         }
-        
+
         // Iris sidequest progressed
         if(vars.stateKeyNew == "intro" + (vars.daisyStage + 1) + "_daisy_yes"){
             vars.Log("Daisy stage completed");
@@ -344,7 +344,7 @@ split
     // Split when lever pulled after boss fight
     if (vars.sceneNameNew == "Glitch" && !old.leverPulled && current.leverPulled) {
         vars.Log("Lever pulled, splitting");
-        return true; 
+        return true;
     }
 
     // Split on entering sub area
