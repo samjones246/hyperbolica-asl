@@ -28,7 +28,8 @@ startup
         (vars.loadLevel = new ExpandoObject()),
         (vars.newGame = new ExpandoObject()),
         //(vars.leverInteract = new ExpandoObject()),
-        (vars.trinketCollect = new ExpandoObject())
+        (vars.trinketCollect = new ExpandoObject()),
+        (vars.worldReset = new ExpandoObject()) // NIL phase advance
     };
 
     vars.loadLevel.name = "LoadLevel";
@@ -55,6 +56,13 @@ startup
     };
     vars.trinketCollect.enabled = true;
 
+    vars.worldReset.name = "WorldReset";
+    vars.worldReset.offset = 0xA46090;
+    vars.worldReset.outputSize = 1;
+    vars.worldReset.overwriteBytes = 6;
+    vars.worldReset.payload = new byte[] { 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00 }; // mov dword ptr [rax], 1
+    vars.worldReset.enabled = true;
+
     // Create settings
     settings.Add("splitCrystal", true, "Split on crystal collection");
 
@@ -74,7 +82,7 @@ startup
 
     settings.Add("splitMisc", false, "Miscellaneous sub splits");
     settings.Add("splitMisc_snowball", true, "Split on snowball fight won", "splitMisc");
-    settings.Add("splitMisc_nilfinal", false, "Split on NIL entering final phase", "splitMisc");
+    settings.Add("splitMisc_nil", false, "Split on NIL phase advance", "splitMisc");
 
     var subareas = new string[] {
         "Cafe",
@@ -251,6 +259,7 @@ init {
         (vars.newGame.output = new MemoryWatcher<bool>((IntPtr)vars.newGame.outputPtr)),
         (vars.trinketCollect.output1 = new MemoryWatcher<IntPtr>((IntPtr)vars.trinketCollect.outputPtr)),
         (vars.trinketCollect.output2 = new MemoryWatcher<int>((IntPtr)vars.trinketCollect.outputPtr + 0x8)),
+        (vars.worldReset.output = new MemoryWatcher<bool>((IntPtr)vars.worldReset.outputPtr))
     };
 
     vars.sceneNameOld = "Unknown";
@@ -369,14 +378,15 @@ split
                 return true;
             }
         }
+    }
 
-        // NIL entering final phase
-        if (vars.stateKeyNew == "boss_last_stage") {
-            vars.Log("NIL last stage");
-            if (settings["splitMisc_nilfinal"]) {
-                vars.Log("NIL final phase split enabled, splitting");
-                return true;
-            }
+    // NIL phase advance
+    if (vars.worldReset.output.Current) {
+        vars.Log("NIL phase advanced");
+        if (settings["splitMisc_nil"]) {
+            vars.Log("NIL phase advance split enabled, splitting");
+            game.WriteBytes((IntPtr)vars.worldReset.outputPtr, new byte[] {0x00});
+            return true;
         }
     }
 
