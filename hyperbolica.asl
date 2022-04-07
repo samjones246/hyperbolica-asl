@@ -80,9 +80,8 @@ startup
     settings.Add("splitSubExit", false, "Split on exiting a subarea");
     settings.SetToolTip("splitSubExit", "Cafe, farm, frosted fields, maze and NEMO");
 
-    settings.Add("splitMisc", false, "Miscellaneous sub splits");
-    settings.Add("splitMisc_snowball", true, "Split on snowball fight won", "splitMisc");
-    settings.Add("splitMisc_nil", false, "Split on NIL phase advance", "splitMisc");
+    settings.Add("splitSnowball", false, "Split on snowball fight won");
+    settings.Add("splitNil", false, "Split on NIL phase advance");
 
     var subareas = new string[] {
         "Cafe",
@@ -373,7 +372,7 @@ split
         // Snowball fight completed
         if (vars.stateKeyNew == "snow_fighter1_snowball_win") {
             vars.Log("Snowball fight won");
-            if (settings["splitMisc_snowball"]) {
+            if (settings["splitSnowball"]) {
                 vars.Log("Snowball fight split enabled, splitting");
                 return true;
             }
@@ -383,7 +382,7 @@ split
     // NIL phase advance
     if (vars.worldReset.output.Current) {
         vars.Log("NIL phase advanced");
-        if (settings["splitMisc_nil"]) {
+        if (settings["splitNil"]) {
             vars.Log("NIL phase advance split enabled, splitting");
             game.WriteBytes((IntPtr)vars.worldReset.outputPtr, new byte[] {0x00});
             return true;
