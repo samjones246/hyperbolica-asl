@@ -28,7 +28,7 @@ startup
         (vars.loadLevel = new ExpandoObject()),
         (vars.newGame = new ExpandoObject()),
         //(vars.leverInteract = new ExpandoObject()),
-        (vars.trinketCollect = new ExpandoObject()),
+        (vars.stateUpdate = new ExpandoObject()),
         (vars.worldReset = new ExpandoObject()) // NIL phase advance
     };
 
@@ -46,15 +46,15 @@ startup
     vars.newGame.payload = new byte[] { 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00 }; // mov dword ptr [rax], 1
     vars.newGame.enabled = true;
 
-    vars.trinketCollect.name = "TrinketCollect";
-    vars.trinketCollect.offset = 0xA34B00;
-    vars.trinketCollect.outputSize = 12;
-    vars.trinketCollect.overwriteBytes = 5;
-    vars.trinketCollect.payload = new byte[] {
+    vars.stateUpdate.name = "StateUpdate";
+    vars.stateUpdate.offset = 0xA34B00;
+    vars.stateUpdate.outputSize = 12;
+    vars.stateUpdate.overwriteBytes = 5;
+    vars.stateUpdate.payload = new byte[] {
         0x48, 0x89, 0x08, // mov [rax], rcx
         0x89, 0x50, 0x08 // mov [rax+8], edx
     };
-    vars.trinketCollect.enabled = true;
+    vars.stateUpdate.enabled = true;
 
     vars.worldReset.name = "WorldReset";
     vars.worldReset.offset = 0xA46090;
@@ -257,8 +257,8 @@ init {
     {
         (vars.loadLevel.output = new MemoryWatcher<IntPtr>((IntPtr)vars.loadLevel.outputPtr)),
         (vars.newGame.output = new MemoryWatcher<bool>((IntPtr)vars.newGame.outputPtr)),
-        (vars.trinketCollect.output1 = new MemoryWatcher<IntPtr>((IntPtr)vars.trinketCollect.outputPtr)),
-        (vars.trinketCollect.output2 = new MemoryWatcher<int>((IntPtr)vars.trinketCollect.outputPtr + 0x8)),
+        (vars.stateUpdate.output1 = new MemoryWatcher<IntPtr>((IntPtr)vars.stateUpdate.outputPtr)),
+        (vars.stateUpdate.output2 = new MemoryWatcher<int>((IntPtr)vars.stateUpdate.outputPtr + 0x8)),
         (vars.worldReset.output = new MemoryWatcher<bool>((IntPtr)vars.worldReset.outputPtr))
     };
 
@@ -284,11 +284,11 @@ update
 
     // Get latest state update
     vars.stateKeyOld = vars.stateKeyNew;
-    if (vars.trinketCollect.output1.Current != vars.trinketCollect.output1.Old) {
-        vars.stateKeyNew = vars.readString(vars.trinketCollect.output1.Current, game);
+    if (vars.stateUpdate.output1.Current != vars.stateUpdate.output1.Old) {
+        vars.stateKeyNew = vars.readString(vars.stateUpdate.output1.Current, game);
     }
     if (vars.stateKeyNew != vars.stateKeyOld){
-        vars.Log("State updated: " + vars.stateKeyNew + ", " + vars.trinketCollect.output2.Current);
+        vars.Log("State updated: " + vars.stateKeyNew + ", " + vars.stateUpdate.output2.Current);
     }
 }
 
