@@ -27,7 +27,7 @@ startup
     vars.hooks = new List<ExpandoObject> {
         (vars.loadLevel = new ExpandoObject()),
         (vars.newGame = new ExpandoObject()),
-        //(vars.leverInteract = new ExpandoObject()),
+        (vars.leverInteract = new ExpandoObject()),
         (vars.stateUpdate = new ExpandoObject()),
         (vars.worldReset = new ExpandoObject()) // NIL phase advance
     };
@@ -63,6 +63,13 @@ startup
     vars.worldReset.payload = new byte[] { 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00 }; // mov dword ptr [rax], 1
     vars.worldReset.enabled = true;
 
+    vars.leverInteract.name = "LeverInteract";
+    vars.leverInteract.offset = 0x713080;
+    vars.leverInteract.outputSize = 1;
+    vars.leverInteract.overwriteBytes = 6;
+    vars.leverInteract.payload = new byte[] { 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00 }; // mov dword ptr [rax], 1
+    vars.leverInteract.enabled = true;
+
     // Create settings
     settings.Add("splitCrystal", true, "Split on crystal collection");
 
@@ -82,6 +89,9 @@ startup
 
     settings.Add("splitSnowball", false, "Split on snowball fight won");
     settings.Add("splitNil", false, "Split on NIL phase advance");
+
+    settings.Add("legacyLever", false, "Use legacy timing");
+    settings.SetToolTip("legacyLever", "End timer when lever animation finishes, not when lever is pulled");
 
     var subareas = new string[] {
         "Cafe",
@@ -258,7 +268,8 @@ init {
         (vars.newGame.output = new MemoryWatcher<bool>((IntPtr)vars.newGame.outputPtr)),
         (vars.stateUpdate.output1 = new MemoryWatcher<IntPtr>((IntPtr)vars.stateUpdate.outputPtr)),
         (vars.stateUpdate.output2 = new MemoryWatcher<int>((IntPtr)vars.stateUpdate.outputPtr + 0x8)),
-        (vars.worldReset.output = new MemoryWatcher<bool>((IntPtr)vars.worldReset.outputPtr))
+        (vars.worldReset.output = new MemoryWatcher<bool>((IntPtr)vars.worldReset.outputPtr)),
+        (vars.leverInteract.output = new MemoryWatcher<bool>((IntPtr)vars.leverInteract.outputPtr))
     };
 
     vars.sceneNameOld = "Unknown";
@@ -389,10 +400,22 @@ split
         }
     }
 
-    // Split when lever pulled after boss fight
+    // Split when lever pulled after boss fight 
     if (vars.sceneNameNew == "Glitch" && !old.leverPulled && current.leverPulled) {
-        vars.Log("Lever pulled, splitting");
-        return true;
+        vars.Log("Lever animation finished");
+        if (settings["legacyLever"]){
+            vars.Log("Splitting");
+            return true;
+        }
+    }
+
+    if (vars.leverInteract.output.Current){
+        vars.Log("Lever pulled");
+        if(!settings["legacyLever"]){
+            vars.Log("Splitting");
+            game.WriteBytes((IntPtr)vars.leverInteract.outputPtr, new byte[] {0x00})
+            return true;
+        }
     }
 
     // Split on entering sub area
