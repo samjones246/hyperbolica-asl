@@ -83,9 +83,19 @@ startup
     settings.Add("splitQuest_daisy", true, "Iris", "splitQuest");
 
     settings.Add("splitSubEnter", false, "Split on entering a subarea");
-    settings.SetToolTip("splitSubEnter", "Cafe, farm, frosted fields, maze and NEMO");
+    settings.Add("splitEnterCafe", true, "Infinity Cafe", "splitSubEnter");
+    settings.Add("splitEnterFarm", true, "De Sitter Farm", "splitSubEnter");
+    settings.Add("splitEnterSnow", true, "Frosted Fields", "splitSubEnter");
+    settings.Add("splitEnterMaze", true, "Maze of Apeirogon", "splitSubEnter");
+    settings.Add("splitEnterGallery", true, "NEMO", "splitSubEnter");
+    settings.Add("splitEnterGlitch", true, "NIL Arena", "splitSubEnter");
+
     settings.Add("splitSubExit", false, "Split on exiting a subarea");
-    settings.SetToolTip("splitSubExit", "Cafe, farm, frosted fields, maze and NEMO");
+    settings.Add("splitExitCafe", true, "Infinity Cafe", "splitSubExit");
+    settings.Add("splitExitFarm", true, "De Sitter Farm", "splitSubExit");
+    settings.Add("splitExitSnow", true, "Frosted Fields", "splitSubExit");
+    settings.Add("splitExitMaze", true, "Maze of Apeirogon", "splitSubExit");
+    settings.Add("splitExitGallery", true, "NEMO", "splitSubExit");
 
     settings.Add("splitSnowball", false, "Split on snowball fight won");
     settings.Add("splitNil", false, "Split on NIL phase advance");
@@ -98,7 +108,8 @@ startup
         "Farm",
         "Snow",
         "Maze",
-        "Gallery"
+        "Gallery",
+        "Glitch"
     };
 
     vars.crystalNames = new string[] {
@@ -128,7 +139,7 @@ startup
     });
 
     vars.enteredSubarea = (Func<bool>)(() => {
-        return vars.sceneNameOld == "Over" && vars.isSubarea(vars.sceneNameNew);
+        return (vars.sceneNameOld == "Over" || vars.sceneNameOld == "Class") && vars.isSubarea(vars.sceneNameNew);
     });
 
     vars.leftSubarea = (Func<bool>)(() => {
@@ -413,21 +424,25 @@ split
         vars.Log("Lever pulled");
         if(!settings["legacyLever"]){
             vars.Log("Splitting");
-            game.WriteBytes((IntPtr)vars.leverInteract.outputPtr, new byte[] {0x00})
+            game.WriteBytes((IntPtr)vars.leverInteract.outputPtr, new byte[] {0x00});
             return true;
         }
     }
 
     // Split on entering sub area
-    if (settings["splitSubEnter"] && vars.enteredSubarea()){
-        vars.Log("Entering subarea, splitting");
-        return true;
+    if (vars.enteredSubarea()){
+        if (settings["splitEnter"+vars.sceneNameNew]){
+            vars.Log("Entering subarea, splitting");
+            return true;
+        }
     }
 
     // Split on exiting a sub area
-    if (settings["splitSubExit"] && vars.leftSubarea()){
-        vars.Log("Leaving subarea, splitting");
-        return true;
+    if (vars.leftSubarea()){
+        if (settings["splitExit"+vars.sceneNameOld]){
+            vars.Log("Leaving subarea, splitting");
+            return true;
+        }
     }
 
     return false;
