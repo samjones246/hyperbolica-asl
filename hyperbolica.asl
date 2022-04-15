@@ -100,7 +100,7 @@ startup
     settings.Add("splitSnowball", false, "Split on snowball fight won");
     settings.Add("splitNil", false, "Split on NIL phase advance");
 
-    settings.Add("legacyLever", false, "Use legacy timing");
+    settings.Add("legacyLever", true, "Use legacy timing");
     settings.SetToolTip("legacyLever", "End timer when lever animation finishes, not when lever is pulled");
 
     var subareas = new string[] {
